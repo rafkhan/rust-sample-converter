@@ -5,6 +5,12 @@ use std::io::Read;
 use std::path::Path;
 use std::path::PathBuf;
 
+struct WavHeader<'a> {
+    bit_depth: u16,
+    sample_rate: u32,
+    path: &'a Path,
+}
+
 fn tree<'a>(directory: &String, wav_list: &'a mut Vec<PathBuf>) -> &'a mut Vec<PathBuf> {
     let entries = fs::read_dir(directory).unwrap();
     for e in entries {
@@ -37,7 +43,15 @@ fn tree<'a>(directory: &String, wav_list: &'a mut Vec<PathBuf>) -> &'a mut Vec<P
     return wav_list;
 }
 
-fn check_wav_header(path: &Path) {
+fn empty_wav_header(path: &Path) -> WavHeader {
+    return WavHeader {
+        bit_depth: 0,
+        sample_rate: 0,
+        path,
+    };
+}
+
+fn get_wav_header(path: &Path) -> WavHeader {
     let mut file = match File::open(path) {
         Err(why) => panic!("couldn't open {}: {}", path.display(), why),
         Ok(file) => file,
@@ -49,14 +63,14 @@ fn check_wav_header(path: &Path) {
         Ok(n) => n,
         Err(e) => {
             eprintln!("Error reading file: {}", e);
-            return;
+            return empty_wav_header(path);
         }
     };
 
     // Verify RIFF header
     if bytes_read < 12 || &buffer[0..4] != b"RIFF" || &buffer[8..12] != b"WAVE" {
         eprintln!("Not a valid WAV file: {}", path.display());
-        return;
+        return empty_wav_header(path);
     }
 
     // Search for "fmt " chunk
@@ -84,10 +98,14 @@ fn check_wav_header(path: &Path) {
                 ]);
                 let bit_depth =
                     u16::from_le_bytes([buffer[bit_depth_offset], buffer[bit_depth_offset + 1]]);
-                println!("{}, {}, {}", sample_rate, bit_depth, path.display());
+                return WavHeader {
+                    sample_rate: sample_rate,
+                    bit_depth: bit_depth,
+                    path: path,
+                };
             }
 
-            return;
+            return empty_wav_header(path);
         }
 
         // Move to next chunk (chunk header is 8 bytes + chunk data)
@@ -95,6 +113,7 @@ fn check_wav_header(path: &Path) {
     }
 
     eprintln!("No fmt chunk found: {}", path.display());
+    return empty_wav_header(path);
 }
 
 fn main() {
@@ -104,7 +123,19 @@ fn main() {
     let mut wav_list: Vec<PathBuf> = Vec::new();
     let updated_wav_list = tree(dir, &mut wav_list);
 
-    for wav_path in updated_wav_list {
-        check_wav_header(&wav_path.as_path());
+    let filtered_wav_list: Vec<WavHeader> = updated_wav_list
+        .iter()
+        .filter_map(|wav_path| {
+            let wav_header = get_wav_header(&wav_path);
+            if wav_header.sample_rate != 44100 || wav_header.bit_depth != 16 {
+                return Some(wav_header);
+            } else {
+                return None;
+            }
+        })
+        .collect();
+
+    for w in filtered_wav_list {
+        println!("{}, {}, {}", w.path.display(), w.sample_rate, w.bit_depth);
     }
 }
