@@ -1,3 +1,6 @@
+mod table;
+
+use crate::table::{WavHeader, WavTable};
 use color_eyre::Result;
 use std::cmp;
 use std::env;
@@ -15,16 +18,10 @@ use ratatui::{
     layout::Rect,
     style::Stylize,
     symbols::border,
-    text::{Line, Text},
-    widgets::{Block, Paragraph, Widget},
+    text::Line,
+    widgets::{Block, Widget},
 };
 
-#[derive(Debug)]
-struct WavHeader<'a> {
-    bit_depth: u16,
-    sample_rate: u32,
-    path: &'a Path,
-}
 
 #[derive(Debug, Default)]
 pub struct App<'a> {
@@ -95,15 +92,11 @@ impl Widget for &App<'_> {
             .title_bottom(instructions.centered())
             .border_set(border::THICK);
 
-        let counter_text = Text::from(vec![Line::from(vec![
-            "Value: ".into(),
-            self.index.to_string().yellow(),
-        ])]);
+        let inner = block.inner(area);
+        block.render(area, buf);
 
-        Paragraph::new(counter_text)
-            .centered()
-            .block(block)
-            .render(area, buf);
+        let table = WavTable::new(&self.wav_list, self.index as usize);
+        table.render(inner, buf);
     }
 }
 
