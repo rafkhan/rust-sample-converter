@@ -1,4 +1,5 @@
 use color_eyre::Result;
+use std::cmp;
 use std::env;
 use std::fs;
 use std::fs::File;
@@ -18,13 +19,28 @@ use ratatui::{
     widgets::{Block, Paragraph, Widget},
 };
 
-#[derive(Debug, Default)]
-pub struct App {
-    counter: u8,
-    exit: bool,
+#[derive(Debug)]
+struct WavHeader<'a> {
+    bit_depth: u16,
+    sample_rate: u32,
+    path: &'a Path,
 }
 
-impl App {
+#[derive(Debug, Default)]
+pub struct App<'a> {
+    exit: bool,
+    wav_list: Vec<WavHeader<'a>>,
+    index: i32,
+}
+
+impl<'a> App<'a> {
+    pub fn new(wav_list: Vec<WavHeader<'a>>) -> Self {
+        Self {
+            exit: false,
+            wav_list,
+            index: 0,
+        }
+    }
     /// runs the application's main loop until the user quits
     pub fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
         while !self.exit {
@@ -40,21 +56,44 @@ impl App {
 
     fn handle_events(&mut self) -> io::Result<()> {
         // todo!()
+        // Ok(())
+        match event::read()? {
+            // it's important to check that the event is a key press event as
+            // crossterm also emits key release and repeat events on Windows.
+            Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
+                self.handle_key_event(key_event)
+            }
+            _ => {}
+        };
         Ok(())
+    }
+
+    fn handle_key_event(&mut self, key_event: KeyEvent) {
+        match key_event.code {
+            KeyCode::Char('q') => self.exit(),
+            KeyCode::Up => self.up(),
+            KeyCode::Down => self.down(),
+            _ => {}
+        }
+    }
+
+    fn exit(&mut self) {
+        self.exit = true;
+    }
+
+    fn up(&mut self) {
+        self.index = cmp::min(self.index + 1, self.wav_list.len() as i32 - 1);
+    }
+
+    fn down(&mut self) {
+        self.index = cmp::max(self.index - 1, 0);
     }
 }
 
-impl Widget for &App {
+impl Widget for &App<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        let title = Line::from(" Counter App Tutorial ".bold());
-        let instructions = Line::from(vec![
-            " Decrement ".into(),
-            "<Left>".blue().bold(),
-            " Increment ".into(),
-            "<Right>".blue().bold(),
-            " Quit ".into(),
-            "<Q> ".blue().bold(),
-        ]);
+        let title = Line::from(" ~ OKAY SYNTHESIZER WAVCONVERT ~ ".bold());
+        let instructions = Line::from(vec![" Quit ".into(), "<Q> ".blue().bold()]);
         let block = Block::bordered()
             .title(title.centered())
             .title_bottom(instructions.centered())
@@ -62,7 +101,7 @@ impl Widget for &App {
 
         let counter_text = Text::from(vec![Line::from(vec![
             "Value: ".into(),
-            self.counter.to_string().yellow(),
+            self.index.to_string().yellow(),
         ])]);
 
         Paragraph::new(counter_text)
@@ -102,12 +141,6 @@ fn tree<'a>(directory: &String, wav_list: &'a mut Vec<PathBuf>) -> &'a mut Vec<P
     }
 
     return wav_list;
-}
-
-struct WavHeader<'a> {
-    bit_depth: u16,
-    sample_rate: u32,
-    path: &'a Path,
 }
 
 fn empty_wav_header(path: &Path) -> WavHeader<'_> {
@@ -183,19 +216,6 @@ fn get_wav_header(path: &Path) -> WavHeader<'_> {
     return empty_wav_header(path);
 }
 
-fn run(mut terminal: DefaultTerminal) -> Result<()> {
-    loop {
-        terminal.draw(render)?;
-        if matches!(event::read()?, Event::Key(_)) {
-            break Ok(());
-        }
-    }
-}
-
-fn render(frame: &mut Frame) {
-    frame.render_widget("hello world", frame.area());
-}
-
 fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
     let dir = &args[1];
@@ -215,13 +235,13 @@ fn main() -> Result<()> {
         })
         .collect();
 
-    for w in filtered_wav_list {
+    for w in &filtered_wav_list {
         println!("{},\t{},\t{}", w.path.display(), w.sample_rate, w.bit_depth);
     }
 
     color_eyre::install()?;
     let mut terminal = ratatui::init();
-    let app_result = App::default().run(&mut terminal);
+    let app_result = App::new(filtered_wav_list).run(&mut terminal);
     ratatui::restore();
     app_result?;
     Ok(())
