@@ -41,7 +41,7 @@ impl<'a> App<'a> {
             index: 0,
         }
     }
-    /// runs the application's main loop until the user quits
+
     pub fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
         while !self.exit {
             terminal.draw(|frame| self.draw(frame))?;
@@ -55,11 +55,7 @@ impl<'a> App<'a> {
     }
 
     fn handle_events(&mut self) -> io::Result<()> {
-        // todo!()
-        // Ok(())
         match event::read()? {
-            // it's important to check that the event is a key press event as
-            // crossterm also emits key release and repeat events on Windows.
             Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
                 self.handle_key_event(key_event)
             }
@@ -71,8 +67,8 @@ impl<'a> App<'a> {
     fn handle_key_event(&mut self, key_event: KeyEvent) {
         match key_event.code {
             KeyCode::Char('q') => self.exit(),
-            KeyCode::Up => self.up(),
-            KeyCode::Down => self.down(),
+            KeyCode::Up => self.prev(),
+            KeyCode::Down => self.next(),
             _ => {}
         }
     }
@@ -81,11 +77,11 @@ impl<'a> App<'a> {
         self.exit = true;
     }
 
-    fn up(&mut self) {
+    fn next(&mut self) {
         self.index = cmp::min(self.index + 1, self.wav_list.len() as i32 - 1);
     }
 
-    fn down(&mut self) {
+    fn prev(&mut self) {
         self.index = cmp::max(self.index - 1, 0);
     }
 }
@@ -93,7 +89,7 @@ impl<'a> App<'a> {
 impl Widget for &App<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let title = Line::from(" ~ OKAY SYNTHESIZER WAVCONVERT ~ ".bold());
-        let instructions = Line::from(vec![" Quit ".into(), "<Q> ".blue().bold()]);
+        let instructions = Line::from(vec![" Quit ".into(), "<q> ".blue().bold()]);
         let block = Block::bordered()
             .title(title.centered())
             .title_bottom(instructions.centered())
