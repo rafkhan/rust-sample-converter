@@ -43,7 +43,7 @@ fn tree<'a>(directory: &String, wav_list: &'a mut Vec<PathBuf>) -> &'a mut Vec<P
     return wav_list;
 }
 
-fn empty_wav_header(path: &Path) -> WavHeader {
+fn empty_wav_header(path: &Path) -> WavHeader<'_> {
     return WavHeader {
         bit_depth: 0,
         sample_rate: 0,
@@ -51,7 +51,7 @@ fn empty_wav_header(path: &Path) -> WavHeader {
     };
 }
 
-fn get_wav_header(path: &Path) -> WavHeader {
+fn get_wav_header(path: &Path) -> WavHeader<'_> {
     let mut file = match File::open(path) {
         Err(why) => panic!("couldn't open {}: {}", path.display(), why),
         Ok(file) => file,
