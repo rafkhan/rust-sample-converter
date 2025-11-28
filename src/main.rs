@@ -73,15 +73,20 @@ fn check_wav_header(path: &Path) {
         if chunk_id == b"fmt " {
             // fmt chunk found - sample rate is at offset 4 within the chunk data
             let sample_rate_offset = pos + 8 + 4;
-            if sample_rate_offset + 4 <= bytes_read {
+            let bit_depth_offset = sample_rate_offset + 10;
+
+            if bit_depth_offset + 2 <= bytes_read {
                 let sample_rate = u32::from_le_bytes([
                     buffer[sample_rate_offset],
                     buffer[sample_rate_offset + 1],
                     buffer[sample_rate_offset + 2],
                     buffer[sample_rate_offset + 3],
                 ]);
-                println!("{}, {}", sample_rate, path.display());
+                let bit_depth =
+                    u16::from_le_bytes([buffer[bit_depth_offset], buffer[bit_depth_offset + 1]]);
+                println!("{}, {}, {}", sample_rate, bit_depth, path.display());
             }
+
             return;
         }
 
