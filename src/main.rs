@@ -1,3 +1,6 @@
+use color_eyre::Result;
+use crossterm::event::{self, Event};
+use ratatui::{DefaultTerminal, Frame};
 use std::env;
 use std::fs;
 use std::fs::File;
@@ -116,7 +119,20 @@ fn get_wav_header(path: &Path) -> WavHeader<'_> {
     return empty_wav_header(path);
 }
 
-fn main() {
+fn run(mut terminal: DefaultTerminal) -> Result<()> {
+    loop {
+        terminal.draw(render)?;
+        if matches!(event::read()?, Event::Key(_)) {
+            break Ok(());
+        }
+    }
+}
+
+fn render(frame: &mut Frame) {
+    frame.render_widget("hello world", frame.area());
+}
+
+fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
     let dir = &args[1];
 
@@ -136,6 +152,12 @@ fn main() {
         .collect();
 
     for w in filtered_wav_list {
-        println!("{}, {}, {}", w.path.display(), w.sample_rate, w.bit_depth);
+        println!("{},\t{},\t{}", w.path.display(), w.sample_rate, w.bit_depth);
     }
+
+    color_eyre::install()?;
+    let terminal = ratatui::init();
+    let result = run(terminal);
+    ratatui::restore();
+    result
 }
