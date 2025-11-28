@@ -1,17 +1,75 @@
 use color_eyre::Result;
-use crossterm::event::{self, Event};
-use ratatui::{DefaultTerminal, Frame};
 use std::env;
 use std::fs;
 use std::fs::File;
+use std::io;
 use std::io::Read;
 use std::path::Path;
 use std::path::PathBuf;
 
-struct WavHeader<'a> {
-    bit_depth: u16,
-    sample_rate: u32,
-    path: &'a Path,
+use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
+use ratatui::{
+    DefaultTerminal, Frame,
+    buffer::Buffer,
+    layout::Rect,
+    style::Stylize,
+    symbols::border,
+    text::{Line, Text},
+    widgets::{Block, Paragraph, Widget},
+};
+
+#[derive(Debug, Default)]
+pub struct App {
+    counter: u8,
+    exit: bool,
+}
+
+impl App {
+    /// runs the application's main loop until the user quits
+    pub fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
+        while !self.exit {
+            terminal.draw(|frame| self.draw(frame))?;
+            self.handle_events()?;
+        }
+        Ok(())
+    }
+
+    fn draw(&self, frame: &mut Frame) {
+        frame.render_widget(self, frame.area());
+    }
+
+    fn handle_events(&mut self) -> io::Result<()> {
+        // todo!()
+        Ok(())
+    }
+}
+
+impl Widget for &App {
+    fn render(self, area: Rect, buf: &mut Buffer) {
+        let title = Line::from(" Counter App Tutorial ".bold());
+        let instructions = Line::from(vec![
+            " Decrement ".into(),
+            "<Left>".blue().bold(),
+            " Increment ".into(),
+            "<Right>".blue().bold(),
+            " Quit ".into(),
+            "<Q> ".blue().bold(),
+        ]);
+        let block = Block::bordered()
+            .title(title.centered())
+            .title_bottom(instructions.centered())
+            .border_set(border::THICK);
+
+        let counter_text = Text::from(vec![Line::from(vec![
+            "Value: ".into(),
+            self.counter.to_string().yellow(),
+        ])]);
+
+        Paragraph::new(counter_text)
+            .centered()
+            .block(block)
+            .render(area, buf);
+    }
 }
 
 fn tree<'a>(directory: &String, wav_list: &'a mut Vec<PathBuf>) -> &'a mut Vec<PathBuf> {
@@ -44,6 +102,12 @@ fn tree<'a>(directory: &String, wav_list: &'a mut Vec<PathBuf>) -> &'a mut Vec<P
     }
 
     return wav_list;
+}
+
+struct WavHeader<'a> {
+    bit_depth: u16,
+    sample_rate: u32,
+    path: &'a Path,
 }
 
 fn empty_wav_header(path: &Path) -> WavHeader<'_> {
@@ -156,8 +220,9 @@ fn main() -> Result<()> {
     }
 
     color_eyre::install()?;
-    let terminal = ratatui::init();
-    let result = run(terminal);
+    let mut terminal = ratatui::init();
+    let app_result = App::default().run(&mut terminal);
     ratatui::restore();
-    result
+    app_result?;
+    Ok(())
 }
